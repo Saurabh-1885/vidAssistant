@@ -1,0 +1,39 @@
+# ===== UI =====
+streamlit>=1.37.0
+
+# ===== Audio acquisition =====
+yt-dlp>=2024.8.6
+ffmpeg-python>=0.2.0
+
+# ===== Transcription (local Whisper) =====
+openai-whisper>=20231117
+torch>=2.2.0
+torchaudio>=2.2.0
+
+# ===== Translation (Hindi -> English) =====
+#googletrans==4.0.0-rc1
+# Alternative/offline option if googletrans is unstable:
+deep-translator>=1.11.4
+
+# ===== LangChain (LCEL) + Mistral =====
+langchain>=0.2.14
+langchain-core>=0.2.38
+langchain-community>=0.2.12
+langchain-mistralai>=0.1.13
+mistralai>=0.4.2
+
+# ===== RAG: Vector store + Embeddings =====
+chromadb>=0.5.5
+sentence-transformers>=3.0.1
+langchain-huggingface>=0.0.3
+huggingface-hub>=0.24.6
+
+# ===== PDF / TXT export =====
+fpdf2>=2.7.9
+reportlab>=4.2.2
+
+# ===== Utilities =====
+python-dotenv>=1.0.1
+tiktoken>=0.7.0
+numpy>=1.26.4
+pandas>=2.2.2
