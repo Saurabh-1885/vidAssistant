@@ -1,4 +1,4 @@
-# 🎬 AI Video Assistant
+# 🎬 AI Meeting Assistant
 
 An AI-powered meeting/video assistant that turns a YouTube link or an uploaded audio/video file into a searchable, chattable meeting record — transcript, summary, action items, key decisions, and a RAG-powered Q&A chat — all from a single Streamlit UI.
 
