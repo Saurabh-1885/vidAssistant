@@ -4,17 +4,22 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import os
+from functools import lru_cache
 
 
 # ---------------------------------------------------------
 # MISTRAL LLM
 # ---------------------------------------------------------
 
+@lru_cache(maxsize=1)
 def get_llm():
+    # Cached: creating a ChatMistralAI client repeatedly is wasteful,
+    # and the Mistral SDK keeps per-client connection/retry state.
     return ChatMistralAI(
         model="mistral-small-latest",
         mistral_api_key=os.getenv("MISTRAL_API_KEY"),
-        temperature=0.2
+        temperature=0.2,
+        max_retries=1,  # SDK default retries hidden API calls on 429/5xx/timeouts
     )
 
 
@@ -98,23 +103,24 @@ Rules:
     # -----------------------------------------------------
     # LONG TRANSCRIPT
     # -----------------------------------------------------
+    # Map-reduce with a BOUND on Mistral calls:
+    #   - keep chunk size large (fewer chunks per pass)
+    #   - merge chunk summaries into groups that fit one
+    #     request, so total calls ≈ ceil(len/15k) + a few
+    #     merge calls + 1 final call — NOT one call per
+    #     small chunk repeated over multiple passes.
 
     chunks = split_transcript(transcript)
 
     print(f"Transcript length: {len(transcript)} characters")
     print(f"Number of chunks: {len(chunks)}")
 
-    chunk_summaries = []
-
-    for i, chunk in enumerate(chunks, start=1):
-
-        print(f"Summarizing chunk {i}/{len(chunks)}...")
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    """
+    # Prompt used for every summarization/reduction pass
+    chunk_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """
 You are an expert meeting summarizer.
 
 Summarize this portion of a meeting transcript.
@@ -136,27 +142,49 @@ Rules:
 - Do not omit important decisions or action items.
 - Be concise.
 """
-                ),
-                (
-                    "human",
-                    "{text}"
-                )
-            ]
-        )
+            ),
+            (
+                "human",
+                "{text}"
+            )
+        ]
+    )
 
-        chain = prompt | llm | StrOutputParser()
+    chunk_chain = chunk_prompt | llm | StrOutputParser()
 
-        summary = chain.invoke({
-            "text": chunk
-        })
+    def group_texts(texts, limit=15000):
+        """Group texts so each combined group fits within one request."""
+        groups = []
+        group = ""
+        for text in texts:
+            candidate = (group + "\n\n" + text) if group else text
+            if len(candidate) > limit and group:
+                groups.append(group)
+                group = text
+            else:
+                group = candidate
+        if group:
+            groups.append(group)
+        return groups
 
-        chunk_summaries.append(summary)
+    # Pass 1 — summarize each transcript chunk
+    current = [chunk_chain.invoke({"text": c}) for i, c in enumerate(chunks, start=1)]
+    print(f"Pass 1: {len(chunks)} chunk summary call(s)")
+
+    # Reduce passes — only needed if partial summaries don't yet fit
+    # into a single final request; keeps total calls minimal.
+    pass_no = 2
+    while len(current) > 1 and len("\n\n".join(current)) > 15000:
+        groups = group_texts(current)
+        current = [chunk_chain.invoke({"text": g}) for g in groups]
+        print(f"Pass {pass_no}: reduced to {len(groups)} call(s)")
+        pass_no += 1
+
+    combined = "\n\n".join(current)
 
     # -----------------------------------------------------
-    # COMBINE SUMMARIES
+    # FINAL SUMMARY (single call)
     # -----------------------------------------------------
-
-    combined = "\n\n".join(chunk_summaries)
 
     final_prompt = ChatPromptTemplate.from_messages(
         [
