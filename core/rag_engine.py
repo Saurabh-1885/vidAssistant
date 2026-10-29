@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -16,6 +17,7 @@ from core.vector_store import (
 
 
 # Create and configure the Mistral LLM
+@lru_cache(maxsize=1)
 def get_llm():
     return ChatMistralAI(
         model="mistral-small-latest",
@@ -26,6 +28,10 @@ def get_llm():
         # Controls how creative/random the model's responses are
         # Lower value = more consistent and focused answers
         temperature=0.3,
+
+        # Limit automatic SDK retries (default retries silently re-send
+        # the request on 429/5xx/timeouts, inflating API call counts)
+        max_retries=1,
     )
 
 

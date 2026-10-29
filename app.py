@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from utils.audio_processor import process_input
 from core.transcriber import transcribe_all
 from core.summarize import summarize, generate_title
-from core.extractor import extract_action_items, extract_key_decisions, extract_questions
+from core.extractor import extract_all
 from core.rag_engine import build_rag_chain, ask_question
 
 load_dotenv()
@@ -507,9 +507,11 @@ if run_btn:
             update_step("summary", "done")
 
             update_step("extract", "active")
-            action_items  = extract_action_items(transcript)
-            decisions     = extract_key_decisions(transcript)
-            questions     = extract_questions(transcript)
+            # ONE Mistral call for all three extractions (was 3 full-transcript calls)
+            extraction = extract_all(transcript)
+            action_items  = extraction["action_items"]
+            decisions     = extraction["key_decisions"]
+            questions     = extraction["open_questions"]
             update_step("extract", "done")
 
             update_step("rag", "active")
